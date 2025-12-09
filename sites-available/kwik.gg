@@ -23,13 +23,7 @@ server {
     }
 }
 
-# HTTP redirect for legacy kwik.zip -> kwik.gg
-server {
-    listen 80;
-    listen [::]:80;
-    server_name kwik.zip www.kwik.zip;
-    return 301 https://kwik.gg$request_uri;
-}
+
 
 # HTTPS server
 server {
