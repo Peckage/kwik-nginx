@@ -50,8 +50,8 @@ server {
     ssl_session_tickets off;
 
     # Logging
-    access_log /var/log/nginx/kwikzip-access.log;
-    error_log /var/log/nginx/kwikzip-error.log warn;
+    access_log /var/log/nginx/kwik-access.log;
+    error_log /var/log/nginx/kwik-error.log warn;
 
     # Unlimited file size (controlled by application)
     client_max_body_size 0;
@@ -74,23 +74,23 @@ server {
     server_tokens off;
 
     # ==========================================================================
-    # RATE LIMITING (uses zones from conf.d/kwikzip-ratelimit.conf)
+    # RATE LIMITING (uses zones from conf.d/kwik-ratelimit.conf)
     # ==========================================================================
-    limit_req zone=kwikzip_general burst=20 nodelay;
-    limit_conn kwikzip_conn 10;
+    limit_req zone=kwik_general burst=20 nodelay;
+    limit_conn kwik_conn 10;
 
     # ==========================================================================
     # STATIC FILES - Next.js Assets
     # ==========================================================================
     location /_next/static/ {
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_cache_valid 200 365d;
         add_header Cache-Control "public, immutable, max-age=31536000";
         access_log off;
     }
 
     location /favicon.ico {
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         expires 30d;
         access_log off;
     }
@@ -111,8 +111,8 @@ server {
             return 403;
         }
 
-        limit_req zone=kwikzip_api burst=1000 nodelay;
-        limit_conn kwikzip_conn 50;
+        limit_req zone=kwik_api burst=1000 nodelay;
+        limit_conn kwik_conn 50;
         client_max_body_size 0;
 
         # 2 hour timeouts for massive uploads
@@ -133,7 +133,7 @@ server {
         aio threads;
         aio_write on;
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -166,9 +166,9 @@ server {
     # API - Other endpoints
     # ==========================================================================
     location /api/ {
-        limit_req zone=kwikzip_api burst=100 nodelay;
+        limit_req zone=kwik_api burst=100 nodelay;
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -182,9 +182,9 @@ server {
     # MAIN APPLICATION
     # ==========================================================================
     location / {
-        limit_req zone=kwikzip_general burst=20 nodelay;
+        limit_req zone=kwik_general burst=20 nodelay;
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -228,8 +228,8 @@ server {
     ssl_session_tickets off;
 
     # Logging
-    access_log /var/log/nginx/kwikzip-download-access.log;
-    error_log /var/log/nginx/kwikzip-download-error.log warn;
+    access_log /var/log/nginx/kwik-download-access.log;
+    error_log /var/log/nginx/kwik-download-error.log warn;
 
     # Unlimited file size
     client_max_body_size 0;
@@ -263,8 +263,8 @@ server {
     # ==========================================================================
     # RATE LIMITING - More restrictive for download domain
     # ==========================================================================
-    limit_req zone=kwikzip_api burst=500 nodelay;
-    limit_conn kwikzip_conn 20;
+    limit_req zone=kwik_api burst=500 nodelay;
+    limit_conn kwik_conn 20;
 
     # ==========================================================================
     # DOWNLOAD PAGES - Maximum Privacy & Security
@@ -279,9 +279,9 @@ server {
         # Prevent any caching
         add_header Clear-Site-Data "cache, storage" always;
 
-        limit_req zone=kwikzip_api burst=200 nodelay;
+        limit_req zone=kwik_api burst=200 nodelay;
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -296,8 +296,8 @@ server {
     # ==========================================================================
     location ~ ^/api/download/ {
         # Strict rate limiting for downloads
-        limit_req zone=kwikzip_api burst=1000 nodelay;
-        limit_conn kwikzip_conn 50;
+        limit_req zone=kwik_api burst=1000 nodelay;
+        limit_conn kwik_conn 50;
 
         # Streaming download - no buffering for security & performance
         proxy_buffering off;
@@ -326,7 +326,7 @@ server {
         postpone_output 0;      # Send immediately
         output_buffers 4 256k;  # Larger output buffers
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -347,14 +347,14 @@ server {
     # STATIC FILES - Next.js Assets
     # ==========================================================================
     location /_next/static/ {
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_cache_valid 200 365d;
         add_header Cache-Control "public, immutable, max-age=31536000";
         access_log off;
     }
 
     location /favicon.ico {
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         expires 30d;
         access_log off;
     }
@@ -368,9 +368,9 @@ server {
             return 301 https://kwik.gg;
         }
 
-        limit_req zone=kwikzip_general burst=20 nodelay;
+        limit_req zone=kwik_general burst=20 nodelay;
 
-        proxy_pass http://kwikzip_app;
+        proxy_pass http://kwik_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

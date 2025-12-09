@@ -1,12 +1,12 @@
-# kwikzip-nginx
+# kwik-nginx
 
 Drop-in nginx configuration for [kwik.gg](https://kwik.gg) (with legacy redirects from kwik.zip) - zero-knowledge encrypted file sharing.
 
 ## Quick Deploy
 
 ```bash
-git clone https://github.com/Peckage/kwikzip-nginx.git
-cd kwikzip-nginx
+git clone https://github.com/Peckage/kwik-nginx.git
+cd kwik-nginx
 sudo ./deploy.sh
 ```
 
@@ -24,13 +24,14 @@ That's it. The script:
 ```text
 /etc/nginx/
 ├── conf.d/
-│   ├── kwikzip-ratelimit.conf    # Rate limiting zones
-│   ├── kwikzip-performance.conf  # Timeouts & buffers for large files
-│   └── kwikzip-upstream.conf     # Upstream to Next.js app
+│   ├── kwik-ratelimit.conf    # Rate limiting zones
+│   ├── kwik-performance.conf  # Timeouts & buffers for large files
+│   ├── kwik-upstream.conf     # Upstream to Next.js app
+│   └── kwik-compression.conf  # Gzip/Brotli compression
 ├── sites-available/
-│   └── kwik.zip                  # Main site config (kwik.gg primary, kwik.zip redirects)
+│   └── kwik.gg                # Main site config (kwik.gg primary, kwik.zip redirects)
 └── sites-enabled/
-    └── kwik.zip -> ../sites-available/kwik.zip
+    └── kwik.gg -> ../sites-available/kwik.gg
 ```
 
 ## Features
@@ -59,11 +60,11 @@ If you prefer not to use the script:
 
 ```bash
 # Copy conf.d files
-sudo cp conf.d/kwikzip-*.conf /etc/nginx/conf.d/
+sudo cp conf.d/kwik-*.conf /etc/nginx/conf.d/
 
 # Copy and enable site
-sudo cp sites-available/kwik.zip /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/kwik.zip /etc/nginx/sites-enabled/
+sudo cp sites-available/kwik.gg /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/kwik.gg /etc/nginx/sites-enabled/
 
 # Test and reload
 sudo nginx -t && sudo systemctl reload nginx
@@ -72,9 +73,9 @@ sudo nginx -t && sudo systemctl reload nginx
 ## Uninstall
 
 ```bash
-sudo rm /etc/nginx/conf.d/kwikzip-*.conf
-sudo rm /etc/nginx/sites-available/kwik.zip
-sudo rm /etc/nginx/sites-enabled/kwik.zip
+sudo rm /etc/nginx/conf.d/kwik-*.conf
+sudo rm /etc/nginx/sites-available/kwik.gg
+sudo rm /etc/nginx/sites-enabled/kwik.gg
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
