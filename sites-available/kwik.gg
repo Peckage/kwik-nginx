@@ -96,29 +96,21 @@ server {
     }
 
     # ==========================================================================
-    # DOWNLOAD PAGES - Maximum Privacy
+    # DOWNLOAD PAGES - Redirect to kwik.zip for enhanced security isolation
     # ==========================================================================
     location ~ ^/d/ {
-        add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, nocache" always;
-        add_header Cache-Control "no-store, no-cache, must-revalidate, private, max-age=0" always;
-        add_header Pragma "no-cache" always;
-
-        limit_req zone=kwikzip_api burst=100 nodelay;
-
-        proxy_pass http://kwikzip_app;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        return 301 https://kwik.zip$request_uri;
     }
 
     # ==========================================================================
-    # API - File Upload
+    # API - File Upload (Restricted to kwik.gg domain only - prevents embed hijacking)
     # ==========================================================================
     location /api/upload {
+        # Block requests without proper origin header or from untrusted origins
+        if ($http_origin !~ "^https?://(www\.)?kwik\.gg$") {
+            return 403;
+        }
+
         limit_req zone=kwikzip_api burst=1000 nodelay;
         limit_conn kwikzip_conn 50;
         client_max_body_size 0;
@@ -139,37 +131,27 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
 
-        add_header Cache-Control "no-store" always;
+        # CORS headers for embed widget (only from kwik.gg)
+        add_header Access-Control-Allow-Origin $http_origin always;
+        add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+        add_header Access-Control-Allow-Credentials "true" always;
+
+        # No caching for API
+        add_header Cache-Control "no-store, no-cache, must-revalidate, private" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
     }
 
     # ==========================================================================
-    # API - File Download
+    # API - File Download (Blocked - Use kwik.zip domain for downloads)
     # ==========================================================================
     location ~ ^/api/download/ {
-        limit_req zone=kwikzip_api burst=1000 nodelay;
-        limit_conn kwikzip_conn 50;
-
-        # Streaming download - no buffering
-        proxy_buffering off;
-        proxy_max_temp_file_size 0;
-
-        # 2 hour timeouts for massive downloads
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 7200s;
-        proxy_read_timeout 7200s;
-
-        # Resumable downloads
-        proxy_force_ranges on;
-
-        proxy_pass http://kwikzip_app;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-
-        add_header Cache-Control "no-store" always;
+        return 301 https://kwik.zip$request_uri;
     }
 
     # ==========================================================================
@@ -219,14 +201,173 @@ server {
     error_page 500 502 503 504 /error;
 }
 
-# HTTPS redirect for legacy kwik.zip -> kwik.gg (requires kwik.zip cert)
+# HTTPS server for kwik.zip - Dedicated secure download domain
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name kwik.zip www.kwik.zip;
 
+    # SSL Certificates (Let's Encrypt)
     ssl_certificate /etc/letsencrypt/live/kwik.zip/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kwik.zip/privkey.pem;
 
-    return 301 https://kwik.gg$request_uri;
+    # Modern SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305';
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Logging
+    access_log /var/log/nginx/kwikzip-download-access.log;
+    error_log /var/log/nginx/kwikzip-download-error.log warn;
+
+    # Unlimited file size
+    client_max_body_size 0;
+
+    # ==========================================================================
+    # ENHANCED SECURITY HEADERS - Download Domain Isolation
+    # ==========================================================================
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    # Stricter CSP for download pages - no scripts except self
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none';" always;
+
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+
+    # Enhanced isolation headers
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet" always;
+
+    # Download-specific security
+    add_header X-Download-Options "noopen" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    server_tokens off;
+
+    # ==========================================================================
+    # RATE LIMITING - More restrictive for download domain
+    # ==========================================================================
+    limit_req zone=kwikzip_api burst=500 nodelay;
+    limit_conn kwikzip_conn 20;
+
+    # ==========================================================================
+    # DOWNLOAD PAGES - Maximum Privacy & Security
+    # ==========================================================================
+    location ~ ^/d/ {
+        # Maximum privacy headers
+        add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, nocache, noimageindex" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, private, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+
+        # Prevent any caching
+        add_header Clear-Site-Data "cache, storage" always;
+
+        limit_req zone=kwikzip_api burst=200 nodelay;
+
+        proxy_pass http://kwikzip_app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # ==========================================================================
+    # API - File Download (Secure, isolated on .zip domain)
+    # ==========================================================================
+    location ~ ^/api/download/ {
+        # Strict rate limiting for downloads
+        limit_req zone=kwikzip_api burst=1000 nodelay;
+        limit_conn kwikzip_conn 50;
+
+        # Streaming download - no buffering for security & performance
+        proxy_buffering off;
+        proxy_max_temp_file_size 0;
+
+        # 2 hour timeouts for massive downloads
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 7200s;
+        proxy_read_timeout 7200s;
+
+        # Resumable downloads
+        proxy_force_ranges on;
+
+        proxy_pass http://kwikzip_app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+
+        # Security headers for file downloads
+        add_header Cache-Control "no-store, no-cache, must-revalidate, private" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Download-Options "noopen" always;
+        add_header Content-Disposition "attachment" always;
+    }
+
+    # ==========================================================================
+    # STATIC FILES - Next.js Assets
+    # ==========================================================================
+    location /_next/static/ {
+        proxy_pass http://kwikzip_app;
+        proxy_cache_valid 200 365d;
+        add_header Cache-Control "public, immutable, max-age=31536000";
+        access_log off;
+    }
+
+    location /favicon.ico {
+        proxy_pass http://kwikzip_app;
+        expires 30d;
+        access_log off;
+    }
+
+    # ==========================================================================
+    # MAIN APPLICATION - Only serve download pages
+    # ==========================================================================
+    location / {
+        # Redirect homepage to kwik.gg
+        if ($request_uri = /) {
+            return 301 https://kwik.gg;
+        }
+
+        limit_req zone=kwikzip_general burst=20 nodelay;
+
+        proxy_pass http://kwikzip_app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # ==========================================================================
+    # SECURITY - Block Everything Else
+    # ==========================================================================
+    location ~ /\.(?!well-known) { deny all; }
+    location ~ /\.git { deny all; }
+    location ~ /\.env { deny all; }
+    location /uploads/ { deny all; return 404; }
+    location /data/ { deny all; return 404; }
+    location ~ \.(db|sqlite|sqlite3|log|sql)$ { deny all; return 404; }
+
+    # Block upload API on download domain
+    location /api/upload { deny all; return 404; }
+
+    # Error pages
+    error_page 404 /404;
+    error_page 500 502 503 504 /error;
 }
