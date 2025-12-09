@@ -47,8 +47,14 @@ server {
     access_log /var/log/nginx/kwik-access.log;
     error_log /var/log/nginx/kwik-error.log warn;
 
-    # Unlimited file size (controlled by application)
+    # Unlimited file size for large uploads
     client_max_body_size 0;
+    client_body_buffer_size 1m;
+    
+    # Extended timeouts for large file transfers (2 hours)
+    client_body_timeout 7200;
+    send_timeout 7200;
+    keepalive_timeout 7200;
 
     # ==========================================================================
     # SECURITY HEADERS - Zero-Knowledge Privacy
