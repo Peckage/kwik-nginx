@@ -125,6 +125,14 @@ server {
         proxy_request_buffering off;
         chunked_transfer_encoding on;
 
+        # High-performance transfer optimizations
+        tcp_nopush off;         # Disable for upload (immediate send)
+        tcp_nodelay on;         # Send data immediately
+
+        # AIO for async operations
+        aio threads;
+        aio_write on;
+
         proxy_pass http://kwikzip_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -303,6 +311,21 @@ server {
         # Resumable downloads
         proxy_force_ranges on;
 
+        # High-performance transfer optimizations
+        tcp_nopush on;          # Batch packets for downloads
+        tcp_nodelay on;         # Don't wait for full packets
+        sendfile on;            # Zero-copy transfers
+        sendfile_max_chunk 2m;  # Prevent blocking on huge files
+
+        # AIO for async I/O operations
+        aio threads;
+        aio_write on;
+        directio 4m;            # Direct I/O for files > 4MB
+
+        # Optimize output
+        postpone_output 0;      # Send immediately
+        output_buffers 4 256k;  # Larger output buffers
+
         proxy_pass http://kwikzip_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -315,6 +338,9 @@ server {
         add_header X-Content-Type-Options "nosniff" always;
         add_header X-Download-Options "noopen" always;
         add_header Content-Disposition "attachment" always;
+
+        # Accept-Ranges for resumable downloads
+        add_header Accept-Ranges bytes always;
     }
 
     # ==========================================================================
